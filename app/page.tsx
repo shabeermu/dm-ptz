@@ -10,15 +10,22 @@ export default function Home() {
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    // Check if we have an active session or a callback code
     const code = searchParams.get("code")
-    const savedId = localStorage.getItem("ig_user_id")
+    const state = searchParams.get("state")
 
-    if (code || savedId) {
-      // If code exists, Redirect to dashboard to handle the handshake (via the new hook)
-      // If local session exists, also redirect
-      router.replace("/dashboard?code=" + (code || ""))
+    if (code) {
+      const params = new URLSearchParams()
+      params.set("code", code)
+      if (state) params.set("state", state)
+      router.replace(`/dashboard?${params.toString()}`)
+      return
     }
+
+    fetch("/api/auth/session")
+      .then((res) => {
+        if (res.ok) router.replace("/dashboard")
+      })
+      .catch(() => {})
   }, [searchParams, router])
 
   return <LandingPage />

@@ -4,344 +4,279 @@ import { useState, useCallback, useEffect } from "react"
 import { useInstagramSession } from "@/hooks/use-instagram-session"
 import { AutomationList } from "@/components/dashboard/AutomationList"
 import { CreateRuleForm } from "@/components/dashboard/CreateRuleForm"
-import { MessageCircle, Send, Sparkles, Plus, Brain, Loader2 } from "lucide-react"
+import { PageHeader, PageSection, PageShell } from "@/components/layout/page-shell"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { Brain, Loader2, Plus } from "lucide-react"
 import type { Automation } from "@/lib/types"
 
 export default function AutomationsPage() {
-    const { userId, isLoading: isSessionLoading } = useInstagramSession()
-    const [automations, setAutomations] = useState<Automation[]>([])
-    const [isLoading, setIsLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState<'comment' | 'dm' | 'story'>('comment')
-    const [showCreateForm, setShowCreateForm] = useState(false)
-    const [editRule, setEditRule] = useState<Automation | null>(null)
-    const [aiEnabled, setAiEnabled] = useState(false)
-    const [aiLoading, setAiLoading] = useState(true)
-    const [aiToggling, setAiToggling] = useState(false)
-    const [showAiContext, setShowAiContext] = useState(false)
-    const [aiContext, setAiContext] = useState("")
-    const [aiContextSaving, setAiContextSaving] = useState(false)
-    const [aiContextSaved, setAiContextSaved] = useState(false)
-    const [groqApiKey, setGroqApiKey] = useState("")
-    const [hasApiKey, setHasApiKey] = useState(false)
-    const [showApiKey, setShowApiKey] = useState(false)
-    const [aiBaseUrl, setAiBaseUrl] = useState("")
-    const [aiModel, setAiModel] = useState("")
+  const { userId, isLoading: isSessionLoading } = useInstagramSession()
+  const [automations, setAutomations] = useState<Automation[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<"comment" | "dm" | "story">("comment")
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [editRule, setEditRule] = useState<Automation | null>(null)
+  const [aiEnabled, setAiEnabled] = useState(false)
+  const [aiLoading, setAiLoading] = useState(true)
+  const [aiToggling, setAiToggling] = useState(false)
+  const [showAiContext, setShowAiContext] = useState(false)
+  const [aiContext, setAiContext] = useState("")
+  const [aiContextSaving, setAiContextSaving] = useState(false)
+  const [aiContextSaved, setAiContextSaved] = useState(false)
+  const [groqApiKey, setGroqApiKey] = useState("")
+  const [hasApiKey, setHasApiKey] = useState(false)
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [aiBaseUrl, setAiBaseUrl] = useState("")
+  const [aiModel, setAiModel] = useState("")
 
-    useEffect(() => {
-        if (!userId) return
-        fetch(`/api/groq/auto-reply?userId=${userId}`)
-            .then(res => res.json())
-            .then(data => {
-                setAiEnabled(data.enabled ?? false)
-                setAiContext(data.ai_context ?? "")
-                setHasApiKey(data.has_api_key ?? false)
-                setAiBaseUrl(data.ai_base_url ?? "")
-                setAiModel(data.ai_model ?? "")
-            })
-            .catch(() => {})
-            .finally(() => setAiLoading(false))
-    }, [userId])
+  useEffect(() => {
+    if (!userId) return
+    fetch(`/api/groq/auto-reply?userId=${userId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setAiEnabled(data.enabled ?? false)
+        setAiContext(data.ai_context ?? "")
+        setHasApiKey(data.has_api_key ?? false)
+        setAiBaseUrl(data.ai_base_url ?? "")
+        setAiModel(data.ai_model ?? "")
+      })
+      .catch(() => {})
+      .finally(() => setAiLoading(false))
+  }, [userId])
 
-    const handleSaveAiContext = async () => {
-        if (aiContextSaving) return
-        setAiContextSaving(true)
-        try {
-            await fetch("/api/groq/auto-reply", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    userId,
-                    enabled: aiEnabled,
-                    ai_context: aiContext,
-                    ai_base_url: aiBaseUrl,
-                    ai_model: aiModel,
-                    ...(groqApiKey !== "" ? { groq_api_key: groqApiKey } : {}),
-                }),
-            })
-            if (groqApiKey) { setHasApiKey(true); setGroqApiKey(""); setShowApiKey(false) }
-            setAiContextSaved(true)
-            setTimeout(() => setAiContextSaved(false), 2000)
-        } catch {}
-        setAiContextSaving(false)
+  const handleSaveAiContext = async () => {
+    if (aiContextSaving || !userId) return
+    setAiContextSaving(true)
+    try {
+      await fetch("/api/groq/auto-reply", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          enabled: aiEnabled,
+          ai_context: aiContext,
+          ai_base_url: aiBaseUrl,
+          ai_model: aiModel,
+          ...(groqApiKey !== "" ? { groq_api_key: groqApiKey } : {}),
+        }),
+      })
+      if (groqApiKey) {
+        setHasApiKey(true)
+        setGroqApiKey("")
+        setShowApiKey(false)
+      }
+      setAiContextSaved(true)
+      setTimeout(() => setAiContextSaved(false), 2000)
+    } catch {
+      /* noop */
     }
+    setAiContextSaving(false)
+  }
 
-    const handleToggleAI = async () => {
-        if (aiToggling) return
-        setAiToggling(true)
-        const newState = !aiEnabled
-        try {
-            const res = await fetch("/api/groq/auto-reply", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ userId, enabled: newState }),
-            })
-            if (res.ok) setAiEnabled(newState)
-        } catch {}
-        setAiToggling(false)
+  const handleToggleAI = async (checked: boolean) => {
+    if (aiToggling || !userId) return
+    setAiToggling(true)
+    try {
+      const res = await fetch("/api/groq/auto-reply", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, enabled: checked }),
+      })
+      if (res.ok) setAiEnabled(checked)
+    } catch {
+      /* noop */
     }
+    setAiToggling(false)
+  }
 
-    const fetchAutomations = useCallback(async () => {
-        if (!userId) return
-        try {
-            const res = await fetch(`/api/automations?userId=${userId}`)
-            const data = await res.json()
-            if (res.ok) setAutomations(Array.isArray(data) ? data : [])
-        } catch (err) {
-            console.error("Fetch error:", err)
-        } finally {
-            setIsLoading(false)
-        }
-    }, [userId])
-
-    useEffect(() => {
-        if (userId) fetchAutomations()
-    }, [userId, fetchAutomations])
-
-    const handleDeleteRule = async (id: string) => {
-        await fetch(`/api/automations?id=${id}`, { method: "DELETE" })
-        fetchAutomations()
+  const fetchAutomations = useCallback(async () => {
+    if (!userId) return
+    try {
+      const res = await fetch(`/api/automations?userId=${userId}`)
+      const data = await res.json()
+      if (res.ok) setAutomations(Array.isArray(data) ? data : [])
+    } catch (err) {
+      console.error("Fetch error:", err)
+    } finally {
+      setIsLoading(false)
     }
+  }, [userId])
 
-    const handleEditRule = (rule: Automation) => {
-        setEditRule(rule)
-        setShowCreateForm(true)
-    }
+  useEffect(() => {
+    if (userId) fetchAutomations()
+  }, [userId, fetchAutomations])
 
-    if (isSessionLoading) {
-        return (
-            <div className="h-screen flex items-center justify-center bg-background">
-                <div className="w-6 h-6 border-2 border-border border-t-primary rounded-full animate-spin" />
-            </div>
-        )
-    }
-    if (!userId) {
-        return (
-            <div className="h-screen flex items-center justify-center bg-background text-muted-foreground">
-                Please log in
-            </div>
-        )
-    }
+  const handleDeleteRule = async (id: string) => {
+    await fetch(`/api/automations?id=${id}`, { method: "DELETE" })
+    fetchAutomations()
+  }
 
-    const filteredAutomations = automations.filter(a => a.trigger_source === activeTab)
-    const counts = {
-        comment: automations.filter(a => a.trigger_source === 'comment').length,
-        dm: automations.filter(a => a.trigger_source === 'dm').length,
-        story: automations.filter(a => a.trigger_source === 'story').length,
-    }
+  const handleEditRule = (rule: Automation) => {
+    setEditRule(rule)
+    setShowCreateForm(true)
+  }
 
-    const tabs = [
-        { key: 'comment' as const, icon: <MessageCircle className="w-4 h-4" />, label: 'Comments', count: counts.comment },
-        { key: 'dm' as const, icon: <Send className="w-4 h-4" />, label: 'DMs', count: counts.dm },
-        { key: 'story' as const, icon: <Sparkles className="w-4 h-4" />, label: 'Stories', count: counts.story },
-    ]
-
+  if (isSessionLoading) {
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            <div className="max-w-5xl mx-auto px-4 md:px-8 py-8 space-y-8">
-                {/* Header */}
-                <div className="flex items-end justify-between gap-4 flex-wrap">
-                    <div>
-                        <p className="font-mono-ui text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-2">Rules engine</p>
-                        <h1 className="font-serif-display text-4xl md:text-5xl text-foreground leading-none">Automations</h1>
-                    </div>
-                    {/* Theme toggle lives in the sidebar — keep this header clean */}
-                    <div className="flex items-center gap-2">
-                        {aiLoading ? (
-                            <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
-                        ) : (
-                            <>
-                                <button
-                                                                    onClick={() => setShowAiContext(!showAiContext)}
-                                                                    aria-expanded={showAiContext}
-                                                                    aria-controls="ai-context-panel"
-                                                                    className="w-9 h-9 flex items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                                                    title="AI settings"
-                                                                    aria-label="AI settings"
-                                                                >
-                                                                    <Brain className="w-4 h-4" />
-                                                                </button>
-                                <button
-                                    onClick={handleToggleAI}
-                                    disabled={aiToggling}
-                                    aria-pressed={aiEnabled}
-                                    className={`flex items-center gap-2 h-9 px-4 rounded-full font-mono-ui text-[11px] font-bold uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                                        aiEnabled
-                                            ? 'bg-accent-yellow text-accent-yellow-foreground border border-accent-yellow'
-                                            : 'bg-card text-muted-foreground border border-border hover:text-foreground hover:bg-accent'
-                                    }`}
-                                >
-                                    <Sparkles className={`w-3.5 h-3.5 ${aiToggling ? 'animate-pulse' : ''}`} />
-                                    {aiToggling ? '...' : aiEnabled ? 'AI ON' : 'AI OFF'}
-                                </button>
-                            </>
-                        )}
-                        <button
-                            onClick={() => {
-                                if (showCreateForm) setEditRule(null)
-                                setShowCreateForm(!showCreateForm)
-                            }}
-                            aria-expanded={showCreateForm}
-                            className={`flex items-center gap-2 h-9 px-5 rounded-full font-mono-ui text-[11px] font-bold uppercase tracking-widest transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                                showCreateForm
-                                    ? 'bg-card text-foreground border border-border hover:bg-accent'
-                                    : 'bg-primary text-primary-foreground hover:opacity-90'
-                            }`}
-                        >
-                            <Plus className={`w-4 h-4 transition-transform duration-200 ${showCreateForm ? 'rotate-45' : ''}`} />
-                            {showCreateForm ? 'Close' : 'New Rule'}
-                        </button>
-                    </div>
-                </div>
-
-                {/* AI Context Panel */}
-                {showAiContext && (
-                    <div className="rounded-2xl border border-[#ffe14d]/20 bg-[#ffe14d]/[0.04] p-5 animate-in fade-in slide-in-from-top-2 duration-200 space-y-4">
-                        <div className="flex items-center gap-2">
-                            <Brain className="w-4 h-4 text-[#ffe14d]" />
-                            <span className="text-sm font-semibold text-[#ffe14d]">AI Settings</span>
-                        </div>
-
-                        {/* API Key */}
-                        <div className="space-y-1.5">
-                            <div className="flex items-center justify-between">
-                                <label className="text-xs text-neutral-400 font-medium">API Key</label>
-                                {hasApiKey && !showApiKey && (
-                                    <span className="text-[10px] text-emerald-500 font-mono">● key saved</span>
-                                )}
-                            </div>
-                            {showApiKey || !hasApiKey ? (
-                                <div className="flex gap-2">
-                                    <input
-                                        type="password"
-                                        value={groqApiKey}
-                                        onChange={e => setGroqApiKey(e.target.value)}
-                                        placeholder={hasApiKey ? "Enter new key to replace…" : "sk_… or gsk_…"}
-                                        className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#ffe14d]/50 transition-colors font-mono"
-                                    />
-                                    {hasApiKey && (
-                                        <button onClick={() => setShowApiKey(false)} className="px-3 py-2.5 rounded-xl border border-white/10 text-neutral-500 text-xs hover:text-white transition-colors">Cancel</button>
-                                    )}
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={() => setShowApiKey(true)}
-                                    className="w-full text-left px-4 py-2.5 rounded-xl border border-white/10 text-neutral-500 text-sm hover:border-white/20 hover:text-white transition-colors"
-                                >
-                                    •••••••••••••••••••• <span className="text-xs ml-2 text-neutral-600">click to replace</span>
-                                </button>
-                            )}
-                        </div>
-
-                        {/* API Base URL */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs text-neutral-400 font-medium">API Base URL <span className="text-neutral-600 font-normal">(optional)</span></label>
-                            <input
-                                type="text"
-                                value={aiBaseUrl}
-                                onChange={e => setAiBaseUrl(e.target.value)}
-                                placeholder="https://api.groq.com/v1  (default) or your own endpoint"
-                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#ffe14d]/50 transition-colors font-mono"
-                            />
-                            <p className="text-[11px] text-neutral-600">Any OpenAI-compatible endpoint works — Groq, OpenAI, Together, your own proxy.</p>
-                        </div>
-
-                        {/* Model */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs text-neutral-400 font-medium">Model <span className="text-neutral-600 font-normal">(optional)</span></label>
-                            <input
-                                type="text"
-                                value={aiModel}
-                                onChange={e => setAiModel(e.target.value)}
-                                placeholder="llama-3.1-8b-instant  (Groq default)"
-                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-[#ffe14d]/50 transition-colors font-mono"
-                            />
-                        </div>
-
-                        {/* AI Personality Context */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs text-neutral-400 font-medium">AI Personality Context</label>
-                            <p className="text-[11px] text-neutral-600">Tell AI about your account — niche, products, tone, what to say/avoid.</p>
-                            <textarea
-                                value={aiContext}
-                                onChange={e => setAiContext(e.target.value)}
-                                placeholder={`e.g. This is a fitness coaching account. I sell online training programs (₹2999/mo). My tone is motivating but chill. If someone asks about pricing, tell them to DM for a free consultation. Never promise specific results.`}
-                                rows={4}
-                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-neutral-600 resize-none focus:outline-none focus:border-[#ffe14d]/50 transition-colors"
-                            />
-                        </div>
-
-                        <button
-                            onClick={handleSaveAiContext}
-                            disabled={aiContextSaving}
-                            className="px-4 py-2 rounded-xl bg-[#ffe14d] hover:brightness-95 text-black text-xs font-bold transition-all disabled:opacity-50"
-                        >
-                            {aiContextSaving ? 'Saving...' : aiContextSaved ? 'Saved ✓' : 'Save'}
-                        </button>
-                    </div>
-                )}
-
-                {/* Tabs — editorial underline */}
-                                <div className="flex items-center gap-6 border-b border-border overflow-x-auto">
-                                    {tabs.map((tab) => {
-                                        const isActive = activeTab === tab.key
-                                        return (
-                                            <button
-                                                key={tab.key}
-                                                onClick={() => setActiveTab(tab.key)}
-                                                className={`relative flex items-center gap-2 pb-3 -mb-px font-mono-ui text-xs uppercase tracking-widest transition-colors border-b-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm ${
-                                                    isActive
-                                                        ? 'text-foreground border-accent-yellow'
-                                                        : 'text-muted-foreground border-transparent hover:text-foreground'
-                                                }`}
-                                            >
-                                                {tab.icon}
-                                                <span>{tab.label}</span>
-                                                {tab.count > 0 && (
-                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                                                        isActive
-                                                            ? 'bg-accent-yellow text-accent-yellow-foreground'
-                                                            : 'bg-secondary text-secondary-foreground'
-                                                    }`}>
-                                                        {tab.count}
-                                                    </span>
-                                                )}
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-
-                {/* Create Form (Collapsible) */}
-                {showCreateForm && (
-                    <div className="rounded-2xl border border-border bg-card p-6 md:p-8 animate-in fade-in slide-in-from-top-2 duration-300">
-                        <CreateRuleForm
-                            userId={userId}
-                            triggerSource={editRule ? editRule.trigger_source : activeTab}
-                            editRule={editRule}
-                            onSuccess={() => {
-                                fetchAutomations()
-                                setShowCreateForm(false)
-                                setEditRule(null)
-                            }}
-                        />
-                    </div>
-                )}
-
-
-                {/* Automation List */}
-                {isLoading ? (
-                    <div className="flex items-center justify-center py-16">
-                        <div className="w-6 h-6 border-2 border-border border-t-primary rounded-full animate-spin" />
-                    </div>
-                ) : (
-                    <AutomationList
-                        automations={filteredAutomations}
-                        onDelete={handleDeleteRule}
-                        onEdit={handleEditRule}
-                        onChanged={fetchAutomations}
-                        userId={userId}
-                    />
-                )}
-            </div>
-        </div>
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
     )
+  }
+
+  if (!userId) {
+    return (
+      <PageShell>
+        <p className="text-sm text-muted-foreground">Please log in to manage automations.</p>
+      </PageShell>
+    )
+  }
+
+  const filteredAutomations = automations.filter((a) => a.trigger_source === activeTab)
+
+  return (
+    <PageShell>
+      <PageHeader
+        title="Automations"
+        description="Create and manage keyword-triggered replies."
+        actions={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="AI settings"
+              aria-pressed={showAiContext}
+              onClick={() => setShowAiContext(!showAiContext)}
+            >
+              <Brain className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (showCreateForm) setEditRule(null)
+                setShowCreateForm(!showCreateForm)
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              {showCreateForm ? "Close" : "New rule"}
+            </Button>
+          </>
+        }
+      />
+
+      <PageSection>
+        {showAiContext && (
+          <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-medium text-foreground">AI auto-reply</h2>
+                <p className="text-sm text-muted-foreground">Fallback replies when no rule matches.</p>
+              </div>
+              {aiLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : (
+                <Switch checked={aiEnabled} disabled={aiToggling} onCheckedChange={handleToggleAI} />
+              )}
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="ai-api-key">API key</Label>
+                {showApiKey || !hasApiKey ? (
+                  <Input
+                    id="ai-api-key"
+                    type="password"
+                    value={groqApiKey}
+                    onChange={(e) => setGroqApiKey(e.target.value)}
+                    placeholder={hasApiKey ? "Enter new key to replace" : "sk_… or gsk_…"}
+                  />
+                ) : (
+                  <Button type="button" variant="outline" className="w-full justify-start" onClick={() => setShowApiKey(true)}>
+                    Saved key — click to replace
+                  </Button>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ai-base-url">API base URL</Label>
+                <Input
+                  id="ai-base-url"
+                  value={aiBaseUrl}
+                  onChange={(e) => setAiBaseUrl(e.target.value)}
+                  placeholder="Optional OpenAI-compatible endpoint"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ai-model">Model</Label>
+                <Input
+                  id="ai-model"
+                  value={aiModel}
+                  onChange={(e) => setAiModel(e.target.value)}
+                  placeholder="Optional model name"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ai-context">Personality context</Label>
+              <Textarea
+                id="ai-context"
+                value={aiContext}
+                onChange={(e) => setAiContext(e.target.value)}
+                rows={4}
+                placeholder="Describe your account, tone, and what the AI should say or avoid."
+              />
+            </div>
+
+            <Button type="button" onClick={handleSaveAiContext} disabled={aiContextSaving}>
+              {aiContextSaving ? "Saving…" : aiContextSaved ? "Saved" : "Save settings"}
+            </Button>
+          </div>
+        )}
+
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
+          <TabsList>
+            <TabsTrigger value="comment">Comments</TabsTrigger>
+            <TabsTrigger value="dm">DMs</TabsTrigger>
+            <TabsTrigger value="story">Stories</TabsTrigger>
+          </TabsList>
+          <TabsContent value={activeTab} className="mt-6 space-y-6">
+            {showCreateForm && (
+              <div className="rounded-xl border border-border bg-card p-5 md:p-6">
+                <CreateRuleForm
+                  userId={userId}
+                  triggerSource={editRule ? editRule.trigger_source : activeTab}
+                  editRule={editRule}
+                  onSuccess={() => {
+                    fetchAutomations()
+                    setShowCreateForm(false)
+                    setEditRule(null)
+                  }}
+                />
+              </div>
+            )}
+
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <AutomationList
+                automations={filteredAutomations}
+                onDelete={handleDeleteRule}
+                onEdit={handleEditRule}
+                onChanged={fetchAutomations}
+                userId={userId}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
+      </PageSection>
+    </PageShell>
+  )
 }

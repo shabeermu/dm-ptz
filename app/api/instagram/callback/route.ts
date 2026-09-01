@@ -1,10 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSupabaseServerClient } from "@/lib/supabase-server"
+import {
+  clearOAuthStateCookie,
+  setSessionCookie,
+  validateOAuthState,
+} from "@/lib/session"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const code = searchParams.get("code")
   const error = searchParams.get("error")
+  const state = searchParams.get("state")
 
   if (error) {
     const redirectUrl = new URL("/", request.url)
@@ -15,19 +21,32 @@ export async function GET(request: NextRequest) {
   if (code) {
     const redirectUrl = new URL("/", request.url)
     redirectUrl.searchParams.set("code", code)
+    if (state) redirectUrl.searchParams.set("state", state)
     return NextResponse.redirect(redirectUrl)
   }
 
   return NextResponse.json({ error: "Invalid callback" }, { status: 400 })
 }
 
+interface UserUpdates {
+  username: string
+  access_token: string
+  token_expires_at: string
+  updated_at: string
+  business_account_id: string
+  page_id: string
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { code } = body
-    if (!code) return NextResponse.json({ error: "No code" }, { status: 400 })
+    const { code, state } = body as { code?: string; state?: string }
 
-    // 1. Env Vars
+    if (!code) return NextResponse.json({ error: "No code" }, { status: 400 })
+    if (!validateOAuthState(request, state)) {
+      return NextResponse.json({ error: "Invalid OAuth state" }, { status: 403 })
+    }
+
     const clientId = process.env.INSTAGRAM_APP_ID
     const clientSecret = process.env.INSTAGRAM_APP_SECRET
     const redirectUri = process.env.NEXT_PUBLIC_INSTAGRAM_REDIRECT_URI
@@ -36,7 +55,6 @@ export async function POST(request: NextRequest) {
       throw new Error("Missing Env Vars: Check INSTAGRAM_APP_ID")
     }
 
-    // 2. Exchange Code for Short Token
     const tokenParams = new URLSearchParams({
       client_id: clientId,
       client_secret: clientSecret,
@@ -54,62 +72,55 @@ export async function POST(request: NextRequest) {
     const tokenData = await tokenRes.json()
     if (!tokenRes.ok) {
       if (tokenData.error_message?.includes("authorization code has been used")) {
-        // Harmless double-fire from React StrictMode or double clicks
         return NextResponse.json({ error: "Code already used" }, { status: 400 })
       }
-      console.error("[v0] 🔴 Token Error:", JSON.stringify(tokenData, null, 2))
+      console.error("[callback] Token error:", JSON.stringify(tokenData, null, 2))
       return NextResponse.json({ error: tokenData.error_description || "Token failed" }, { status: 400 })
     }
 
-    const shortToken = tokenData.access_token
+    const shortToken = tokenData.access_token as string
     const loginUserId = tokenData.user_id.toString()
 
-    // 3. Exchange for Long Token (60 Days)
-    const longLivedUrl = `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${clientSecret}&access_token=${shortToken}`
-    const longRes = await fetch(longLivedUrl)
-    const longData = await longRes.json()
-    const accessToken = longData.access_token || shortToken
-    const expiresIn = longData.expires_in || 5184000
+    const longLivedUrl = new URL("https://graph.instagram.com/access_token")
+    longLivedUrl.searchParams.set("grant_type", "ig_exchange_token")
+    longLivedUrl.searchParams.set("client_secret", clientSecret)
+    longLivedUrl.searchParams.set("access_token", shortToken)
 
-    // 4. Get Username + IG Professional Account ID (webhook-matching ID)
-    // Per Meta docs: /me?fields=user_id returns the IG_ID that matches webhook entry.id
-    // https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/get-started
+    const longRes = await fetch(longLivedUrl.toString())
+    const longData = await longRes.json()
+    const accessToken = (longData.access_token as string) || shortToken
+    const expiresIn = (longData.expires_in as number) || 5184000
+
     let username = `user_${loginUserId}`
-    let businessAccountId = loginUserId // fallback
+    let businessAccountId = loginUserId
     let profilePic: string | null = null
 
     try {
-      const meRes = await fetch(
-        `https://graph.instagram.com/v24.0/me?fields=user_id,username,profile_picture_url&access_token=${accessToken}`
-      )
+      const meUrl = new URL("https://graph.instagram.com/v24.0/me")
+      meUrl.searchParams.set("fields", "user_id,username,profile_picture_url")
+      meUrl.searchParams.set("access_token", accessToken)
+
+      const meRes = await fetch(meUrl.toString())
       const meData = await meRes.json()
-      console.log("[v0] 📋 /me response:", JSON.stringify(meData))
 
       if (meData.username) username = meData.username
       if (meData.profile_picture_url) profilePic = meData.profile_picture_url
       if (meData.user_id) {
         businessAccountId = meData.user_id.toString()
-        console.log(`[v0] 🎯 Got IG Professional Account ID (user_id): ${businessAccountId}`)
-      } else {
-        console.warn(`[v0] ⚠️ /me did not return user_id, using loginUserId: ${loginUserId}`)
       }
-    } catch (e) {
-      console.error("[v0] /me request failed:", e)
+    } catch (error) {
+      console.error("[callback] /me request failed:", error)
     }
 
-    // 6. Save/Update User
     const supabase = await getSupabaseServerClient()
-
-    const updates: any = {
+    const updates: UserUpdates = {
       username,
       access_token: accessToken,
       token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
       updated_at: new Date().toISOString(),
       business_account_id: businessAccountId,
-      page_id: businessAccountId, // Always keep in sync
+      page_id: businessAccountId,
     }
-
-    console.log(`[v0] 💾 Saving user: ${username} | id=${loginUserId} | biz_id=${businessAccountId}`)
 
     const { error: upsertError } = await supabase
       .from("users")
@@ -117,16 +128,23 @@ export async function POST(request: NextRequest) {
 
     if (upsertError) throw upsertError
 
-    const response = NextResponse.json({ success: true, username, userId: loginUserId, profilePic })
-    response.cookies.set("insta_session", JSON.stringify({ username, userId: loginUserId }), {
-      path: "/",
-      maxAge: expiresIn,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+    const response = NextResponse.json({
+      success: true,
+      username,
+      userId: loginUserId,
+      profilePic,
     })
-    return response
 
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    await setSessionCookie(
+      response,
+      { userId: loginUserId, username, profilePic },
+      expiresIn,
+    )
+    clearOAuthStateCookie(response)
+
+    return response
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Internal server error"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

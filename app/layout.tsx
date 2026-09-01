@@ -10,8 +10,8 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "InstaAuto — Instagram Automation",
-  description: "Auto-reply to comments, DMs, and stories with keyword triggers.",
+  title: "DM-PTZ",
+  description: "Internal Instagram automation dashboard.",
   icons: {
     icon: [
       {
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 const themeBootstrap = `
 (function() {
   try {
-    var stored = window.localStorage.getItem('insta-p8-theme');
+    var stored = window.localStorage.getItem('dm-ptz-theme');
     var theme = (stored === 'light' || stored === 'dark' || stored === 'system') ? stored : 'dark';
     var resolved = theme === 'system'
       ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')

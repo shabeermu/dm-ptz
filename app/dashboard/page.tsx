@@ -1,158 +1,138 @@
 "use client"
 
+import type React from "react"
 import { useEffect, useState } from "react"
-import { Card } from "@/components/ui/card"
+import Link from "next/link"
 import { useInstagramSession } from "@/hooks/use-instagram-session"
-import { Activity, Users, MessageCircle, Zap, Loader2 } from "lucide-react"
+import { PageHeader, PageSection, PageShell } from "@/components/layout/page-shell"
+import { Button } from "@/components/ui/button"
+import { Activity, Loader2, MessageCircle, Users, Zap } from "lucide-react"
 
 interface DashboardStats {
-    metrics: {
-        totalAutomations: number
-        activeTriggers: number
-        audienceReached: number
-        messagesSent: number
+  metrics: {
+    totalAutomations: number
+    activeTriggers: number
+    audienceReached: number
+    messagesSent: number
+  }
+  recentActivity: Array<{
+    id: string
+    content: string
+    created_at: string
+    recipient?: {
+      recipient_username: string
     }
-    recentActivity: Array<{
-        id: string
-        content: string
-        created_at: string
-        recipient?: {
-            recipient_username: string
-        }
-    }>
+  }>
 }
 
 export default function DashboardPage() {
-    const { username, userId, isLoading: isSessionLoading } = useInstagramSession()
-    const [stats, setStats] = useState<DashboardStats | null>(null)
-    const [loading, setLoading] = useState(true)
+  const { username, userId, isLoading: isSessionLoading } = useInstagramSession()
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [loading, setLoading] = useState(true)
 
-    useEffect(() => {
-        if (!userId) return
+  useEffect(() => {
+    if (!userId) return
 
-        const fetchStats = async () => {
-            try {
-                const res = await fetch(`/api/dashboard/stats?userId=${userId}`)
-                const data = await res.json()
-                if (data && !data.error) {
-                    setStats(data)
-                }
-            } catch (err) {
-                console.error("Failed to load dashboard stats", err)
-            } finally {
-                setLoading(false)
-            }
+    const fetchStats = async () => {
+      try {
+        const res = await fetch(`/api/dashboard/stats?userId=${userId}`)
+        const data = await res.json()
+        if (data && !data.error) {
+          setStats(data)
         }
-
-        fetchStats()
-    }, [userId])
-
-    if (isSessionLoading || loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[50vh]">
-                <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
-            </div>
-        )
+      } catch (err) {
+        console.error("Failed to load dashboard stats", err)
+      } finally {
+        setLoading(false)
+      }
     }
 
+    fetchStats()
+  }, [userId])
+
+  if (isSessionLoading || loading) {
     return (
-        <div className="p-8 space-y-8 animate-in fade-in duration-700">
-            {/* Welcome Section */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <p className="font-mono-ui text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-2">Overview</p>
-                    <h1 className="font-serif-display text-4xl md:text-5xl text-foreground leading-none">Hey, {username}.</h1>
-                    <p className="text-muted-foreground text-sm mt-3">Here's what your automations did while you were away.</p>
-                </div>
-            </div>
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    title="Total Automations"
-                    value={stats?.metrics.totalAutomations.toString() || "0"}
-                    trend="Active"
-                    icon={<Zap className="w-5 h-5 text-accent-yellow-foreground dark:text-accent-yellow" />}
-                />
-                <StatCard
-                    title="Messages Sent"
-                    value={stats?.metrics.messagesSent.toString() || "0"}
-                    trend="Lifetime"
-                    icon={<MessageCircle className="w-5 h-5 text-accent-yellow-foreground dark:text-accent-yellow" />}
-                />
-                <StatCard
-                    title="Active Triggers"
-                    value={stats?.metrics.activeTriggers.toString() || "0"}
-                    trend="Running"
-                    icon={<Activity className="w-5 h-5 text-accent-yellow-foreground dark:text-accent-yellow" />}
-                />
-                <StatCard
-                    title="Audience Reached"
-                    value={stats?.metrics.audienceReached.toString() || "0"}
-                    trend="Unique Users"
-                    icon={<Users className="w-5 h-5 text-accent-yellow-foreground dark:text-accent-yellow" />}
-                />
-            </div>
-
-            {/* Recent Activity */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <Card className="p-6 bg-card border-border">
-                    <h3 className="font-serif-display text-2xl text-foreground mb-5">Recent activity</h3>
-                    <div className="space-y-4">
-                        {stats?.recentActivity && stats.recentActivity.length > 0 ? (
-                            stats.recentActivity.map((msg) => (
-                                <div key={msg.id} className="flex items-center gap-4 p-3 rounded-lg hover:bg-accent transition-colors">
-                                    <div className="w-10 h-10 rounded-full bg-accent-yellow/15 flex items-center justify-center text-accent-yellow-foreground dark:text-accent-yellow shrink-0">
-                                        <MessageCircle className="w-5 h-5" />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <p className="text-sm text-foreground font-medium truncate">
-                                            Auto-reply to @{msg.recipient?.recipient_username || "user"}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground truncate w-full max-w-[300px]">{msg.content}</p>
-                                    </div>
-                                    <div className="ml-auto text-[10px] text-muted-foreground whitespace-nowrap">
-                                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="py-8 text-center text-muted-foreground text-sm">
-                                No recent activity found.
-                            </div>
-                        )}
-                    </div>
-                </Card>
-
-                <Card className="p-6 bg-card border-border">
-                    <h3 className="font-serif-display text-2xl text-foreground mb-5">Quick actions</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="h-24 rounded-xl border border-dashed border-border flex flex-col items-center justify-center hover:bg-accent hover:border-accent-yellow cursor-pointer transition-colors group">
-                            <Zap className="w-6 h-6 text-muted-foreground group-hover:text-accent-yellow-foreground dark:group-hover:text-accent-yellow mb-2 transition-colors" />
-                            <span className="text-xs font-medium text-foreground">New Rule</span>
-                        </div>
-                        <div className="h-24 rounded-xl border border-dashed border-border flex flex-col items-center justify-center hover:bg-accent hover:border-accent-yellow cursor-pointer transition-colors group">
-                            <Users className="w-6 h-6 text-muted-foreground group-hover:text-accent-yellow-foreground dark:group-hover:text-accent-yellow mb-2 transition-colors" />
-                            <span className="text-xs font-medium text-foreground">View Audience</span>
-                        </div>
-                    </div>
-                </Card>
-            </div>
-        </div>
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
     )
+  }
+
+  return (
+    <PageShell>
+      <PageHeader
+        title={`Welcome back${username ? `, ${username}` : ""}`}
+        description="A summary of your automation activity."
+      />
+
+      <PageSection>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Automations" value={stats?.metrics.totalAutomations ?? 0} icon={<Zap className="h-4 w-4" />} />
+          <StatCard title="Messages sent" value={stats?.metrics.messagesSent ?? 0} icon={<MessageCircle className="h-4 w-4" />} />
+          <StatCard title="Active triggers" value={stats?.metrics.activeTriggers ?? 0} icon={<Activity className="h-4 w-4" />} />
+          <StatCard title="Audience reached" value={stats?.metrics.audienceReached ?? 0} icon={<Users className="h-4 w-4" />} />
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="rounded-xl border border-border bg-card">
+            <div className="border-b border-border px-5 py-4">
+              <h2 className="text-sm font-medium text-foreground">Recent activity</h2>
+            </div>
+            <div className="divide-y divide-border">
+              {stats?.recentActivity && stats.recentActivity.length > 0 ? (
+                stats.recentActivity.map((msg) => (
+                  <div key={msg.id} className="flex items-start justify-between gap-4 px-5 py-4">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        Reply to @{msg.recipient?.recipient_username || "user"}
+                      </p>
+                      <p className="mt-1 truncate text-sm text-muted-foreground">{msg.content}</p>
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="px-5 py-8 text-center text-sm text-muted-foreground">No recent activity.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-5">
+            <h2 className="text-sm font-medium text-foreground">Quick actions</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Jump to common tasks.</p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Button asChild className="flex-1">
+                <Link href="/dashboard/automations">Create automation</Link>
+              </Button>
+              <Button asChild variant="outline" className="flex-1">
+                <Link href="/dashboard/inbox">Open inbox</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </PageSection>
+    </PageShell>
+  )
 }
 
-function StatCard({ title, value, trend, icon }: { title: string, value: string, trend: string, icon: React.ReactNode }) {
-    return (
-        <div className="p-6 rounded-2xl border border-border bg-card hover:border-foreground/20 transition-colors group">
-            <div className="flex items-start justify-between">
-                {icon}
-                <span className="font-mono-ui text-[10px] uppercase tracking-widest text-muted-foreground">{trend}</span>
-            </div>
-            <div className="mt-6">
-                <p className="font-serif-display text-5xl text-foreground leading-none">{value}</p>
-                <p className="font-mono-ui text-[10px] text-muted-foreground uppercase tracking-[0.2em] mt-3">{title}</p>
-            </div>
-        </div>
-    )
+function StatCard({
+  title,
+  value,
+  icon,
+}: {
+  title: string
+  value: number
+  icon: React.ReactNode
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-5">
+      <div className="flex items-center justify-between text-muted-foreground">
+        {icon}
+      </div>
+      <p className="mt-4 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{title}</p>
+    </div>
+  )
 }

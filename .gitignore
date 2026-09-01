@@ -2,23 +2,36 @@
 
 # dependencies
 /node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
 # next.js
 /.next/
 /out/
+.next/
 
 # production
 /build
+/dist
 
-# debug
+# debug / logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
+logs/
 
-# env files
+# env files & secrets
 .env*
 !.env.example
+*.pem
+*.key
 
 # vercel
 .vercel
@@ -27,6 +40,61 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# testing / coverage
+/coverage
+.nyc_output
+
+# caches
+.turbo
+.cache
+.eslintcache
+.parcel-cache
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# editor / IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# local tooling config
+.mcp.json
+.codex/
+
+# markdown / local notes
+*.md
+!README.md
+
+# local database dumps / scratch files
+/db
+/db.*
+
 # video files (test/generated)
 *.mp4
 /washed_videos/
+
+# python (scripts)
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+.venv/
+venv/
+.env.python
+
+# misc local artifacts
+*.local
+*.tmp
+*.temp

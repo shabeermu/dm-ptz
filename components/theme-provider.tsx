@@ -13,7 +13,7 @@ type ThemeContextValue = {
 
 const ThemeContext = React.createContext<ThemeContextValue | null>(null)
 
-const STORAGE_KEY = "insta-p8-theme"
+const STORAGE_KEY = "dm-ptz-theme"
 
 /**
  * Apply the resolved theme to <html>. We toggle the .dark class and set

@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS public.users (
   page_id TEXT,
   groq_auto_reply_enabled BOOLEAN DEFAULT FALSE,
   ai_context TEXT DEFAULT NULL,
+  groq_api_key TEXT DEFAULT NULL,
+  ai_base_url TEXT DEFAULT NULL,
+  ai_model TEXT DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
@@ -427,4 +430,11 @@ $$;
 --     $$DELETE FROM public.unlock_attempts WHERE updated_at < NOW() - INTERVAL '24 hours'$$);
 -- Or run manually in the SQL editor:
 --   DELETE FROM public.unlock_attempts WHERE updated_at < NOW() - INTERVAL '24 hours';
+
+-- =========================================================================
+-- Additive column migrations (safe to re-run on existing databases)
+-- =========================================================================
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS groq_api_key TEXT DEFAULT NULL;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS ai_base_url TEXT DEFAULT NULL;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS ai_model TEXT DEFAULT NULL;
 -- =========================================================================

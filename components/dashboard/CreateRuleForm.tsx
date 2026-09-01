@@ -35,6 +35,7 @@ const STEPS = [
 export function CreateRuleForm({ userId, triggerSource, onSuccess, editRule }: CreateRuleFormProps) {
   const isEditing = !!editRule
   const [step, setStep] = useState(0)
+  const [showPreview, setShowPreview] = useState(false)
 
   /* ---------- WHEN ---------- */
   const [triggers, setTriggers] = useState<string[]>([])
@@ -257,9 +258,24 @@ export function CreateRuleForm({ userId, triggerSource, onSuccess, editRule }: C
   }
 
   return (
-    <div className="space-y-8">
-      {/* ── Sexy Stepper Timeline ── */}
-      <div className="relative bg-card border border-border rounded-2xl p-4 md:px-8">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Step {step + 1} of {STEPS.length}
+        </p>
+        {replyMode !== "public_only" && (
+          <button
+            type="button"
+            onClick={() => setShowPreview((value) => !value)}
+            className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            {showPreview ? "Hide preview" : "Show preview"}
+          </button>
+        )}
+      </div>
+
+      {/* Stepper */}
+      <div className="relative rounded-xl border border-border bg-card p-4 md:px-6">
         <div className="flex items-center justify-between gap-4 relative">
           {STEPS.map((s, i) => {
             const isActive = i === step
@@ -271,11 +287,11 @@ export function CreateRuleForm({ userId, triggerSource, onSuccess, editRule }: C
                   onClick={() => { if (i < step || stepValid[step]) setStep(i) }}
                   className="flex items-center gap-3 group text-left focus:outline-none"
                 >
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all duration-300 ${
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-semibold transition-all duration-300 ${
                     isCompleted
-                      ? "bg-accent-yellow text-black shadow-[0_0_15px_rgba(255,225,77,0.3)]"
+                      ? "bg-primary text-primary-foreground"
                       : isActive
-                        ? "bg-white text-black ring-4 ring-white/10"
+                        ? "bg-foreground text-background"
                         : "bg-muted text-muted-foreground border border-border"
                   }`}>
                     {isCompleted ? <Check className="w-4 h-4 stroke-[3]" /> : i + 1}
@@ -289,7 +305,7 @@ export function CreateRuleForm({ userId, triggerSource, onSuccess, editRule }: C
                 </button>
                 {i < STEPS.length - 1 && (
                   <div className="flex-1 h-[2px] mx-2 relative bg-muted rounded-full overflow-hidden">
-                    <div className={`absolute inset-y-0 left-0 transition-all duration-500 bg-accent-yellow ${
+                    <div className={`absolute inset-y-0 left-0 transition-all duration-500 bg-primary ${
                       isCompleted ? "w-full" : "w-0"
                     }`} />
                   </div>
@@ -301,7 +317,7 @@ export function CreateRuleForm({ userId, triggerSource, onSuccess, editRule }: C
       </div>
 
       {/* ── Two Column Workspace ── */}
-      <div className="grid lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_340px] gap-6 xl:gap-8 items-start">
+      <div className={`grid items-start gap-6 ${showPreview && replyMode !== "public_only" ? "lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_340px]" : "grid-cols-1"} xl:gap-8`}>
         {/* ── LEFT: Config Form ── */}
         <div className="bg-card border border-border rounded-2xl p-5 md:p-8 space-y-6 min-w-0">
           {/* ===== STEP 1: TRIGGER ===== */}
@@ -328,7 +344,7 @@ export function CreateRuleForm({ userId, triggerSource, onSuccess, editRule }: C
                         onClick={() => setStoryTriggerType(key)}
                         className={`p-4 rounded-xl border text-left flex flex-col gap-2 transition-all duration-200 ${
                           storyTriggerType === key
-                            ? "border-accent-yellow bg-accent-yellow/10 text-accent-yellow-foreground"
+                            ? "border-foreground/20 bg-muted text-foreground"
                             : "border-border text-muted-foreground hover:border-border hover:text-foreground bg-muted/30"
                         }`}
                       >
@@ -362,7 +378,7 @@ export function CreateRuleForm({ userId, triggerSource, onSuccess, editRule }: C
                         }}
                         className={`aspect-square rounded-xl border flex flex-col items-center justify-center p-2 sm:p-4 text-center transition-all duration-200 ${
                                                   hasSelectedReelOption && selectedReel === null
-                                                    ? "border-accent-yellow ring-2 ring-accent-yellow/30 bg-accent-yellow/10"
+                                                    ? "border-foreground/30 ring-2 ring-ring/20 bg-accent-yellow/10"
                                                     : "border-border bg-card hover:border-foreground/30 hover:bg-accent"
                                                 }`}
                                               >
@@ -383,7 +399,7 @@ export function CreateRuleForm({ userId, triggerSource, onSuccess, editRule }: C
                             }}
                             className={`aspect-square rounded-xl border overflow-hidden relative group text-left transition-all duration-200 bg-neutral-900 ${
                                                         isSelected
-                                                          ? "border-accent-yellow ring-2 ring-accent-yellow/30"
+                                                          ? "border-foreground/30 ring-2 ring-ring/20"
                                                           : "border-border hover:border-foreground/40"
                                                       }`}
                                                     >
@@ -740,7 +756,7 @@ export function CreateRuleForm({ userId, triggerSource, onSuccess, editRule }: C
                 type="button"
                 onClick={() => { if (stepValid[step]) setStep(step + 1) }}
                 disabled={!stepValid[step]}
-                className="flex items-center gap-2 h-11 px-6 rounded-full bg-white text-black font-mono-ui text-xs font-bold hover:bg-accent-yellow hover:shadow-[0_0_20px_rgba(255,225,77,0.25)] active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed ml-auto"
+                className="flex items-center gap-2 h-11 px-6 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed ml-auto"
               >
                 Continue
                 <ChevronRight className="w-4 h-4" />
@@ -750,7 +766,7 @@ export function CreateRuleForm({ userId, triggerSource, onSuccess, editRule }: C
                 type="button"
                 onClick={handleSubmit}
                 disabled={!canSave || saving}
-                className="flex items-center justify-center gap-2 h-11 px-8 rounded-full bg-accent-yellow text-black font-mono-ui text-sm font-bold hover:brightness-95 hover:shadow-[0_0_25px_rgba(255,225,77,0.35)] active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed ml-auto"
+                className="flex items-center justify-center gap-2 h-11 px-8 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed ml-auto"
               >
                 {saving ? <Loader2 className="w-4.5 h-4.5 animate-spin" /> : <Zap className="w-4 h-4 stroke-[2.5]" />}
                 {saving ? "Saving Changes..." : isEditing ? "Save Automation" : "Go Live"}
@@ -760,8 +776,8 @@ export function CreateRuleForm({ userId, triggerSource, onSuccess, editRule }: C
         </div>
 
         {/* ── RIGHT: iPhone Mockup — ALWAYS dark regardless of page theme ── */}
-        {replyMode !== "public_only" && (
-          <div className="hidden lg:block sticky top-6 dark">
+        {showPreview && replyMode !== "public_only" && (
+          <div className="sticky top-6 dark">
             <div className="text-center mb-3">
               <span className="font-mono-ui text-[10px] uppercase tracking-[0.25em] text-neutral-400 font-bold">Interactive Preview</span>
             </div>

@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import {
-  Trash2, Globe, Instagram, Zap, ArrowRight, Lock, MessageCircle, Send,
-  Pencil, Copy, Image as ImageIcon, Megaphone, EyeOff, Timer,
-} from "lucide-react"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Copy, Globe, Instagram, MoreHorizontal, Pencil, Trash2, Zap } from "lucide-react"
 import type { Automation } from "@/lib/types"
 import { toast } from "sonner"
 
@@ -33,13 +35,17 @@ export function AutomationList({ automations, onDelete, onEdit, onChanged, userI
         const data = await res.json()
         if (data.data && Array.isArray(data.data)) {
           const map: Record<string, string> = {}
-          data.data.forEach((item: any) => { map[item.id] = item.thumbnail_url || item.media_url })
+          data.data.forEach((item: { id: string; thumbnail_url?: string; media_url?: string }) => {
+            map[item.id] = item.thumbnail_url || item.media_url || ""
+          })
           setMediaMap(map)
         }
-      } catch (e) { console.error("Failed to load thumbnails", e) }
+      } catch (e) {
+        console.error("Failed to load thumbnails", e)
+      }
     }
     fetchMedia()
-  }, [userId, automations.length])
+  }, [userId, automations.length, postSpecificRules.length])
 
   const handleToggle = async (rule: Automation, active: boolean) => {
     const res = await fetch("/api/automations", {
@@ -62,7 +68,7 @@ export function AutomationList({ automations, onDelete, onEdit, onChanged, userI
       body: JSON.stringify({ id: rule.id, action: "duplicate" }),
     })
     if (res.ok) {
-      toast.success("Duplicated — the copy starts paused")
+      toast.success("Automation duplicated")
       onChanged()
     } else {
       toast.error("Failed to duplicate")
@@ -71,229 +77,189 @@ export function AutomationList({ automations, onDelete, onEdit, onChanged, userI
 
   if (automations.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border bg-card/40 p-12 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center border border-border bg-muted">
-          <Zap className="w-7 h-7 text-muted-foreground" />
+      <div className="rounded-xl border border-dashed border-border bg-card/40 p-12 text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+          <Zap className="h-5 w-5 text-muted-foreground" />
         </div>
-        <h3 className="text-base font-bold text-foreground mb-1">No automations yet</h3>
-        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-          Create your first automation above — it just takes 30 seconds.
+        <h3 className="text-base font-medium text-foreground">No automations yet</h3>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+          Create your first rule using the button above.
         </p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-          Rules
-          <span className="bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full text-[10px]">
-            {automations.length}
-          </span>
-        </h2>
-      </div>
+    <div className="space-y-8">
+      {globalRules.length > 0 && (
+        <RuleSection title="Global rules" rules={globalRules} mediaMap={mediaMap} onDelete={onDelete} onEdit={onEdit} onToggle={handleToggle} onDuplicate={handleDuplicate} />
+      )}
+      {postSpecificRules.length > 0 && (
+        <RuleSection
+          title="Post-specific rules"
+          rules={postSpecificRules}
+          mediaMap={mediaMap}
+          onDelete={onDelete}
+          onEdit={onEdit}
+          onToggle={handleToggle}
+          onDuplicate={handleDuplicate}
+          isSpecific
+        />
+      )}
+    </div>
+  )
+}
 
-      <div className="space-y-3">
-        {globalRules.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-accent-blue ml-1">
-              <Globe className="w-3 h-3" /> Global
-            </div>
-            {globalRules.map((rule, idx) => (
-              <RuleCard key={rule.id} rule={rule} onDelete={onDelete} onEdit={onEdit} onToggle={handleToggle} onDuplicate={handleDuplicate} index={idx} />
-            ))}
-          </div>
-        )}
-
-        {postSpecificRules.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-accent-pink ml-1">
-              <Instagram className="w-3 h-3" /> Post Specific
-            </div>
-            {postSpecificRules.map((rule, idx) => (
-              <RuleCard key={rule.id} rule={rule} onDelete={onDelete} onEdit={onEdit} onToggle={handleToggle} onDuplicate={handleDuplicate} index={idx} mediaUrl={mediaMap[rule.specific_media_id || ""]} isSpecific />
-            ))}
-          </div>
-        )}
+function RuleSection({
+  title,
+  rules,
+  mediaMap,
+  onDelete,
+  onEdit,
+  onToggle,
+  onDuplicate,
+  isSpecific = false,
+}: {
+  title: string
+  rules: Automation[]
+  mediaMap: Record<string, string>
+  onDelete: (id: string) => void
+  onEdit: (rule: Automation) => void
+  onToggle: (rule: Automation, active: boolean) => void
+  onDuplicate: (rule: Automation) => void
+  isSpecific?: boolean
+}) {
+  return (
+    <div className="space-y-3">
+      <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
+      <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+        {rules.map((rule) => (
+          <RuleRow
+            key={rule.id}
+            rule={rule}
+            onDelete={onDelete}
+            onEdit={onEdit}
+            onToggle={onToggle}
+            onDuplicate={onDuplicate}
+            isSpecific={isSpecific}
+            mediaUrl={mediaMap[rule.specific_media_id || ""]}
+          />
+        ))}
       </div>
     </div>
   )
 }
 
-function RuleCard({ rule, onDelete, onEdit, onToggle, onDuplicate, index, isSpecific, mediaUrl }: {
+function RuleRow({
+  rule,
+  onDelete,
+  onEdit,
+  onToggle,
+  onDuplicate,
+  isSpecific,
+  mediaUrl,
+}: {
   rule: Automation
   onDelete: (id: string) => void
   onEdit: (rule: Automation) => void
   onToggle: (rule: Automation, active: boolean) => void
   onDuplicate: (rule: Automation) => void
-  index: number
   isSpecific?: boolean
   mediaUrl?: string
 }) {
-  const [confirming, setConfirming] = useState(false)
-  const keywords = rule.trigger_value.split(",").map(k => k.trim()).filter(Boolean)
-  const content: any = rule.response_content || {}
-  const isCard = !!content.card
-  const isMedia = !!content.media
-  const responsePreview = isCard
-    ? content.card.title
-    : isMedia
-      ? `${content.media.type} attachment`
-      : (content.message?.slice(0, 50) || "") + (content.message?.length > 50 ? "..." : "")
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const keywords = rule.trigger_value.split(",").map((k) => k.trim()).filter(Boolean)
+  const content = (rule.response_content || {}) as {
+    card?: { title?: string }
+    media?: { type?: string }
+    message?: string
+    reply_mode?: string
+    delay_seconds?: number
+    check_follow?: boolean
+  }
 
-  const replyMode = content.reply_mode
-  const isPaused = rule.is_active === false
+  const responsePreview = content.card?.title
+    ? content.card.title
+    : content.media?.type
+      ? `${content.media.type} attachment`
+      : content.message
+        ? `${content.message.slice(0, 60)}${content.message.length > 60 ? "…" : ""}`
+        : "No preview"
+
+  const metaParts = [
+    keywords.length ? keywords.join(", ") : "Any keyword",
+    responsePreview,
+    content.reply_mode === "dm_only" ? "DM only" : content.reply_mode === "public_only" ? "Public only" : null,
+    content.delay_seconds ? `${content.delay_seconds}s delay` : null,
+    content.check_follow ? "Follow gate" : null,
+    rule.is_active === false ? "Paused" : null,
+  ].filter(Boolean)
 
   return (
-    <div
-      className={`group p-4 rounded-xl border transition-all duration-200 ${
-        isPaused
-          ? "border-border bg-card/40 opacity-70"
-          : "border-border bg-card hover:bg-accent hover:border-foreground/20"
-      }`}
-      style={{ animationDelay: `${index * 60}ms` }}
-    >
-      <div className="flex items-start gap-3">
-        {isSpecific ? (
-          <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted shrink-0 border border-border">
-            {mediaUrl ? (
-              <img src={mediaUrl} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Instagram className="w-4 h-4 text-muted-foreground" />
-              </div>
-            )}
+    <div className={`flex items-center gap-4 px-4 py-4 ${rule.is_active === false ? "opacity-70" : ""}`}>
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
+        {isSpecific && mediaUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={mediaUrl} alt="" className="h-full w-full object-cover" />
+        ) : isSpecific ? (
+          <Instagram className="h-4 w-4 text-muted-foreground" />
+        ) : (
+          <Globe className="h-4 w-4 text-muted-foreground" />
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{rule.name}</p>
+        <p className="mt-1 truncate text-sm text-muted-foreground">{metaParts.join(" · ")}</p>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
+        <Switch
+          checked={rule.is_active !== false}
+          onCheckedChange={(value) => onToggle(rule, value)}
+          aria-label={rule.is_active === false ? "Enable automation" : "Pause automation"}
+        />
+
+        {confirmDelete ? (
+          <div className="flex items-center gap-1">
+            <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                onDelete(rule.id)
+                setConfirmDelete(false)
+              }}
+            >
+              Delete
+            </Button>
           </div>
         ) : (
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-accent-blue/10 border border-accent-blue/30">
-            <Globe className="w-4 h-4 text-accent-blue" />
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="icon" aria-label={`Actions for ${rule.name}`}>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(rule)}>
+                <Pencil className="h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDuplicate(rule)}>
+                <Copy className="h-4 w-4" />
+                Duplicate
+              </DropdownMenuItem>
+              <DropdownMenuItem variant="destructive" onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
-
-        <div className="flex-1 min-w-0 space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <h4 className="text-sm font-bold text-foreground truncate">{rule.name}</h4>
-            <div className="flex items-center gap-1 shrink-0">
-              {confirming ? (
-                <div className="flex items-center gap-1 animate-in fade-in">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setConfirming(false)}
-                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => onDelete(rule.id)}
-                    className="h-7 text-xs bg-destructive text-destructive-foreground hover:opacity-90"
-                  >
-                    Delete
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  {/* Edit / Duplicate / Delete are ALWAYS visible (no hover reveal) */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onEdit(rule)}
-                    title="Edit"
-                    aria-label={`Edit ${rule.name}`}
-                    className="h-7 w-7 text-foreground/70 hover:text-foreground hover:bg-accent transition-colors"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onDuplicate(rule)}
-                    title="Duplicate"
-                    aria-label={`Duplicate ${rule.name}`}
-                    className="h-7 w-7 text-foreground/70 hover:text-foreground hover:bg-accent transition-colors"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setConfirming(true)}
-                    title="Delete"
-                    aria-label={`Delete ${rule.name}`}
-                    className="h-7 w-7 text-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                  <Switch
-                    checked={!isPaused}
-                    onCheckedChange={(v) => onToggle(rule, v)}
-                    aria-label={isPaused ? "Resume automation" : "Pause automation"}
-                    title={isPaused ? "Resume automation" : "Pause automation"}
-                    className="ml-1 scale-90"
-                  />
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1 flex-wrap">
-              {keywords.slice(0, 3).map((kw, i) => (
-                <Badge
-                  key={i}
-                  variant="secondary"
-                  className="bg-secondary text-secondary-foreground border border-border text-[10px] font-mono-ui px-1.5 py-0"
-                >
-                  {kw}
-                </Badge>
-              ))}
-              {keywords.length > 3 && (
-                <span className="text-[10px] text-muted-foreground">+{keywords.length - 3}</span>
-              )}
-            </div>
-
-            <ArrowRight className="w-3 h-3 text-muted-foreground shrink-0" />
-
-            <div className="flex items-center gap-1.5">
-              {isCard ? (
-                <Send className="w-3 h-3 text-accent-blue" />
-              ) : isMedia ? (
-                <ImageIcon className="w-3 h-3 text-accent-pink" />
-              ) : (
-                <MessageCircle className="w-3 h-3 text-accent-yellow-foreground dark:text-accent-yellow" />
-              )}
-              <span className="text-[11px] text-muted-foreground truncate max-w-[120px]">{responsePreview}</span>
-            </div>
-
-            {replyMode === "dm_only" && (
-              <Badge variant="secondary" className="bg-accent-blue/10 text-accent-blue border border-accent-blue/30 text-[10px] px-1.5 py-0">
-                <EyeOff className="w-2.5 h-2.5 mr-0.5" /> DM only
-              </Badge>
-            )}
-            {replyMode === "public_only" && (
-              <Badge variant="secondary" className="bg-accent-pink/10 text-accent-pink border border-accent-pink/30 text-[10px] px-1.5 py-0">
-                <Megaphone className="w-2.5 h-2.5 mr-0.5" /> Public only
-              </Badge>
-            )}
-            {content.delay_seconds > 0 && (
-              <Badge variant="secondary" className="bg-secondary text-secondary-foreground border border-border text-[10px] px-1.5 py-0">
-                <Timer className="w-2.5 h-2.5 mr-0.5" /> {content.delay_seconds}s
-              </Badge>
-            )}
-            {content.check_follow && (
-              <Badge variant="secondary" className="bg-accent-yellow/10 text-accent-yellow-foreground dark:text-accent-yellow border border-accent-yellow/30 text-[10px] px-1.5 py-0">
-                <Lock className="w-2.5 h-2.5 mr-0.5" /> Follow
-              </Badge>
-            )}
-            {isPaused && (
-              <Badge variant="secondary" className="bg-muted text-muted-foreground border border-border text-[10px] px-1.5 py-0">
-                Paused
-              </Badge>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   )
