@@ -4,9 +4,10 @@ import { useState, KeyboardEvent } from "react"
 import { X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 interface TagInputProps {
-    value: string[] // Array of tags
+    value: string[]
     onChange: (tags: string[]) => void
     placeholder?: string
     className?: string
@@ -20,7 +21,6 @@ export function TagInput({ value, onChange, placeholder, className }: TagInputPr
             e.preventDefault()
             addTag()
         } else if (e.key === "Backspace" && !inputValue && value.length > 0) {
-            // Remove last tag on backspace if input is empty
             removeTag(value.length - 1)
         }
     }
@@ -38,20 +38,25 @@ export function TagInput({ value, onChange, placeholder, className }: TagInputPr
     }
 
     return (
-        <div className={`flex flex-wrap gap-2 p-2 rounded-lg border border-white/10 bg-black/20 focus-within:border-[#ffe14d]/50 transition-all ${className}`}>
+        <div
+            className={cn(
+                "flex flex-wrap gap-2 rounded-xl border border-border bg-muted/30 p-2 transition-all focus-within:border-foreground/30",
+                className,
+            )}
+        >
             {value.map((tag, index) => (
                 <Badge
                     key={index}
                     variant="secondary"
-                    className="bg-[#ffe14d]/10 text-[#ffe14d] border-[#ffe14d]/25 hover:bg-[#ffe14d]/20 pl-2.5 pr-1 py-1 text-xs font-medium gap-1.5"
+                    className="gap-1.5 border-border bg-muted py-1 pl-2.5 pr-1 text-xs font-medium text-foreground"
                 >
                     {tag}
                     <button
                         type="button"
                         onClick={() => removeTag(index)}
-                        className="hover:bg-purple-500/40 rounded-sm p-0.5 transition-colors"
+                        className="rounded-sm p-0.5 transition-colors hover:bg-foreground/10"
                     >
-                        <X className="w-3 h-3" />
+                        <X className="h-3 w-3" />
                     </button>
                 </Badge>
             ))}
@@ -61,7 +66,7 @@ export function TagInput({ value, onChange, placeholder, className }: TagInputPr
                 onKeyDown={handleKeyDown}
                 onBlur={addTag}
                 placeholder={value.length === 0 ? placeholder : ""}
-                className="flex-1 min-w-[120px] border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-sm px-1"
+                className="min-w-[120px] flex-1 border-0 bg-transparent px-1 text-sm text-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
             />
         </div>
     )
